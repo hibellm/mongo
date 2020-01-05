@@ -1,0 +1,26 @@
+{
+  "dataobject": {
+    "type": "table",
+    "checksum": "xxcv56hjxsbmfhhd9agtnfghtrwhkbdanaf543g12345sfdvghwzdbag",
+    "title": "Concomitant Medications",
+    "filename": "cm_",
+    "creationdate" : { "$date": "2019-12-08T22:48:17Z"},
+    "lastmodifieddate" : { "$date": "2019-12-08T22:48:17Z"},
+    "specifications": {
+      "format": "multiset table",
+      "encoding": "UTF-8",
+      "observations": 2543,
+      "identifiers": [
+        "STUDYID",
+        "USUBJID",
+        "ROWID"
+      ]
+    },
+    "location": {
+      "system": "Teradata",
+      "database": "ds_ctdc_abc123",
+      "path": "ds.ctdc_abc123.cm_",
+      "accesstype": "No restriction"
+    }
+  }
+}
