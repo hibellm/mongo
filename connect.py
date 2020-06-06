@@ -22,6 +22,13 @@ dsidb = client.dsi    # Select the database
 dsido = dsidb.DataObject
 dsidv = dsidb.DeliverObject
 dsidict = dsidb.dictionary
+dsistudy = dsidb.StudyMetadata
+dsitrain = dsidb.train
+
+
+query = {}
+documents = list(dsitrain.find(query))
+
 
 
 # FIND SOMETHING
@@ -48,7 +55,8 @@ result = dsido.insert_one({"last_modified": dt.datetime.utcnow()})
 # https://docs.mongodb.com/manual/reference/operator/update-field/
 # https://docs.mongodb.com/manual/reference/operator/query/
 
-query = {'dataobject.type': "table"}
+x = 'table'
+query = {'dataobject.type': x}
 print(f"The number of observations retrieved : {dsido.count_documents(query)}")
 
 x = dsido.find()
@@ -56,10 +64,47 @@ x = dsido.find()
 for doc in dsido.find():
     print(doc)
 
+studyx = 'BP27272'
+query = {'study_number': studyx}
+print(f"The number of observations retrieved : {dsistudy.count_documents(query)}")
+
+
+
+
 update = {'$currentDate': {"lastmodifieddate.date": {'$type': "timestamp"}}}
 result = dsido.update_many(query, update)
 for doc in result:
     print(doc)
+
+
+
+# WORKING WITH STUDY INFO
+import json
+from bson import BSON
+from bson import json_util
+db = client.dsi  # Select the database
+dsismd = db.StudyMetadata  # Select the collection
+query = {}
+print(f"The number of observations retrieved : {dsismd.count_documents(query)}")
+
+y = []
+x = (dsismd.find(query))
+for doc in x:
+    y.append(doc)
+
+study = 'ABC1234'
+# LOOKING IN ANOTHER DOCUMENT
+query = {'dataobject.location.database': f'ds_ctdc_{study.lower()}'}
+print(f"The number of observations retrieved : {dsido.count_documents(query)}")
+# OPEN A FILE
+
+f = open("myfile.txt", "w")
+x = (dsido.find(query))
+for doc in x:
+    print(doc['dataobject']['type'])
+    f.write(json.dumps(doc, sort_keys=True, indent=4, default=json_util.default))
+f.close()
+
 
 
 
@@ -192,8 +237,3 @@ url = 'http://www.thefamouspeople.com/singers.php'
 response = http.request('GET', url)
 import chardet
 chardet.detect(response)
-
-
-
-chardet.detect(s)
-print(s)

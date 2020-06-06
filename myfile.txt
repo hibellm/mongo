@@ -1,0 +1,81 @@
+{
+    "_id": {
+        "$oid": "5dec28e4e441cef45086b308"
+    },
+    "dataobject": {
+        "checksum": "asf56hjxsbmfhhd9agtnfghtrwhkbdanaf543g12345sfdvghwzdbag",
+        "creationdate": {
+            "$date": 1575758897433
+        },
+        "filename": "dm",
+        "lastmodifieddate": {
+            "$date": 1575758897433
+        },
+        "location": {
+            "accesstype": "No restriction",
+            "database": "ds_ctdc_abc1234",
+            "path": "",
+            "system": "Teradata"
+        },
+        "specifications": {
+            "encoding": "UTF-8",
+            "format": "multiset table",
+            "identifiers": [
+                "STUDYID",
+                "USUBJID",
+                "ROWID"
+            ],
+            "observations": 1000
+        },
+        "title": "Demography",
+        "type": "table"
+    },
+    "lastmodifieddate": {
+        "date": {
+            "$timestamp": {
+                "i": 1,
+                "t": 1589043102
+            }
+        }
+    }
+}{
+    "_id": {
+        "$oid": "5ded170ae441cef45086bfe3"
+    },
+    "dataobject": {
+        "checksum": "bsbgfbfsgbsgfb9agtnfghtrwhkbdanaf543g12345sfdvghwzdbag",
+        "creationdate": {
+            "$date": 1575845297433
+        },
+        "filename": "ae_",
+        "lastmodifieddate": {
+            "$date": 1575845297433
+        },
+        "location": {
+            "accesstype": "No restriction",
+            "database": "ds_ctdc_abc1234",
+            "path": "",
+            "system": "Teradata"
+        },
+        "specifications": {
+            "encoding": "UTF-8",
+            "format": "multiset table",
+            "identifiers": [
+                "STUDYID",
+                "USUBJID",
+                "ROWID"
+            ],
+            "observations": 1347
+        },
+        "title": "Adverse Events",
+        "type": "table"
+    },
+    "lastmodifieddate": {
+        "date": {
+            "$timestamp": {
+                "i": 2,
+                "t": 1589043102
+            }
+        }
+    }
+}
