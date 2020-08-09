@@ -26,17 +26,115 @@ dsistudy = dsidb.StudyMetadata
 dsitrain = dsidb.train
 
 
-query = {}
-documents = list(dsitrain.find(query))
+
+
+def getdocs(col=None, query={}):
+    if col:
+        m = list(col.find(query))
+        print(f"{col.count_documents(query)} documents were retrieved from: {col.full_name} using query: {query}")
+        return m
+    else:
+        print(f"No collection given - Stopping processing!")
+
+
+docs = getdocs(dsitrain, {})
+docs = getdocs(dsidv, {})
+docs = getdocs(vendors, {"name": "Marcus Hibell"})
+docs = getdocs(vendors, {"name": "Marcus Hibell", "last_modified": {"$exists" : "true"}})
+docs = getdocs(vendors, {"name": "Marcus Hibell", "last_modified": {"$gt" : dt.datetime(2020,7,27)}} )
+
+
+def updatedocs(col=None, query={}, update={}):
+    if col:
+        print(f"{col.count_documents(query)} documents were found from: {col.full_name} using query: {query}")
+        col.update_many(query, update)
+        print(f"{col.count_documents(query)} documents were updated: using query: {update}")
+        m = list(col.find(query))
+        return m
+    else:
+        print(f"No collection given - Stopping processing!")
+
+udocs = updatedocs(vendors, {"name": "Marcus Hibell"}, {'$set': {'code': 'mjhxxx'}})
+udocs = updatedocs(vendors, {"name": "Marcus Hibell", "last_modified": {"$exists" : "true"}}, {'$set': {"last_modified": dt.datetime.utcnow()}})
+udocs = updatedocs(vendors,
+                   {"name": "Marcus Hibell", "last_modified": {"$gt" : dt.datetime(2020,7,27)}},
+                   {'$set': {"last_modified": dt.datetime.utcnow()}})
+
+
+def insertone(col=None, insert={}):
+    if col:
+        try:
+            a = col.insert_one(insert)
+            print(f"Document was inserted: ObjectId: {a}")
+        except Exception as e:
+            print(f"Insert did not work : {e}")
+    else:
+        print(f"No collection given - Stopping processing!")
+
+# INSERT A DATE
+idocs = insertone(vendors, {"test_modified": dt.datetime.utcnow()})
+
+
+def insertmany(col=None, insert=[]):
+    if col:
+        try:
+            col.insert_many(insert)
+            print(f"{len(insert)} Document was inserted")
+        except Exception as e:
+            print(f"Insert did not work : {e}")
+    else:
+        print(f"No collection given - Stopping processing!")
+
+# INSERT MANY (A LIST OF DICTIONARIES)
+insertmany(vendors, [{"test_modified": dt.datetime.utcnow()}])
+
+
+#ADD TO AN ARRAY (LIST) - IF EXISTING WILL NOT ADD
+col = dsidict
+col.update_one({"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$addToSet": { "varlist": 'xxx'}})
+col.update_one({"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$addToSet": { "varlist": ['xxx','yyy','zzz']}})
+col.update_one({"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$addToSet": { "varlist": {"$each": ['xxx','yyy','zzz']}}})
+
+#POP item from array - the numbering is reverse of python (-1 = first
+col.update_one( {"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$pop": { "varlist": -1 }})   #POP FIRST
+col.update_one( {"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$pop": { "varlist": -2 }})   #POP FIRST TWO
+col.update_one( {"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$pop": { "varlist": 1 }})   #POP LAST
+col.update_one( {"_id" : ObjectId("5e0913e9648e3412bcf19178")}, { "$pull": { "varlist": 1 }})   #PULL LAST
+
+#PULL IS LIIKE POPING -  BUT WORKS ON THE VALUE NOT THE POSITION
+col.update_one( { }, { "$pull": { "fruits": { "$in": [ 'apples', 'oranges' ] }, "vegetables": 'carrots' }}, { "multi": "true" })
+col.update( { "_id": 1 }, { "$pull": { "votes": { "$gte": 6 }}})
+col.update({ "_id": 1 }, { "$push": { "scores": {"$each": [ 50, 60, 70 ], "$position": 2 }}})
+
+#AGGREGATION
+col.aggregate( [ {"$addFields": { "totalHomework": { "$sum": '$homework' }, "totalQuiz": { "$sum": '$quiz' }}},
+                 {"$addFields": { "totalScore": { "$add": [ '$totalHomework', '$totalQuiz', '$extraCredit' ] }}}
+] )
 
 
 
-# FIND SOMETHING
-x = vendors.find({"name": "Marcus Hibell"})
-# PRINT OUT THE RESULTS
-for doc in x:
-    print(doc)
+# COMMAND LINE EXPORT
+mongoexport -d=dbname -c=collection -q='{ "metrictimestamp": { "$gte": { "$date": "2018-02-01T00:00:00Z" }, "$lt": { "$date": "2018-02-02T00:00:00Z" } } }'
 
+
+
+col=vendors
+query = {"name": "Marcus Hibell"}
+insert = {"test_modified": dt.datetime.utcnow()}
+col.insert(insert)
+
+col.insert_many()
+
+
+
+insertdt = updatedocs(vendors, {"name": "Marcus Hibell"}, {"last_modified": dt.datetime.utcnow()})
+
+
+"dt" :
+{
+    "$gte" : ISODate("2014-07-02T00:00:00Z"),
+    "$lt" : ISODate("2014-07-03T00:00:00Z")
+}
 # COUNT SOMETHING
 print(f"The number of observations retreived : {vendors.count_documents({'name': 'Marcus Hibell'})}")
 
@@ -69,7 +167,7 @@ query = {'study_number': studyx}
 print(f"The number of observations retrieved : {dsistudy.count_documents(query)}")
 
 
-
+https://www.tutorialspoint.com/check-for-null-in-mongodb
 
 update = {'$currentDate': {"lastmodifieddate.date": {'$type': "timestamp"}}}
 result = dsido.update_many(query, update)

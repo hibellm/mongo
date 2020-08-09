@@ -1,0 +1,182 @@
+[{
+  "request": {
+    "type": "Data Sharing Request",
+    "date": "2020-06-20T21:32:21.688Z",
+    "method": "Form",
+    "reference": "23e362c5-19ce-4ac1-97e0-688d5ad3a2af"
+  },
+  "requestor": {
+    "firstname": "Peter",
+    "lastname": "Parker",
+    "email": "PP@newspaper.nyc"
+  },
+  "requestdetail": {
+    "summary": "Require Oncology study BP29772 for analysis",
+    "description": "the BP2772 study is a study that is required\n for Oncology paper. \n Anonymized data is required",
+    "other": [
+      {"study": "bp29772",
+      "patnum": "> 50 Patients",
+      "model": "SDTM",
+      "datacut": "",
+      "spaname": "Paul Dick",
+      "bioname": "John Clesese"
+    }]
+  },
+  "status": [
+    [
+      "Open",
+      "2020-06-20T21:32:21.688Z",
+      "dsi_code"
+    ]
+  ],
+  "processed": false
+},
+{
+  "request": {
+    "type": "Data Sharing Request",
+    "date": "2020-06-23T21:32:21.688Z",
+    "method": "Form",
+    "reference": "0bc4eeb9-2b04-42b3-9378-ca5d348daaaa"
+  },
+  "requestor": {
+    "firstname": "Mickey",
+    "lastname": "Mouse",
+    "email": "mm@disney.ca"
+  },
+  "requestdetail": {
+    "summary": "Require Opthalmic studies  'iris/retena'",
+    "description": "Reuqire anonymization of the 2 opthalmic studies is a study that is required\n for Oncology paper. \n Anonymized data is required",
+    "other": [
+      {"study": "GO00888",
+      "patnum": "> 50 Patients",
+      "model": "SDTM",
+      "datacut": "",
+      "spaname": "Paul Dick",
+      "bioname": "John Clesese"
+    },
+      {"study": "GO00889",
+      "patnum": "> 50 Patients",
+      "model": "SDTM",
+      "datacut": "",
+      "spaname": "Paul Dick",
+      "bioname": "John Clesese"
+    }
+    ]
+  },
+  "status": [
+    [
+      "Open",
+      "2020-06-23T21:32:21.688Z",
+      "dsi_code"
+    ]
+  ],
+  "processed": false
+},
+{
+  "request": {
+    "type": "Data Sharing Request",
+    "date": "2020-06-24T21:32:21.688Z",
+    "method": "Form",
+    "reference": "0bc4eeb9-2b04-42b3-9378-ca5d348daaaa"
+  },
+  "requestor": {
+    "firstname": "Mickey",
+    "lastname": "Mouse",
+    "email": "mm@disney.ca"
+  },
+  "requestdetail": {
+    "summary": "Require 3 COVID-19 studies '",
+    "description": "Reuqire anonymization of the 3  studies is a study that is required\n for COVID-19.",
+    "other": [
+      {"study": "AC1234",
+      "patnum": "> 50 Patients",
+      "model": "Shogun",
+      "datacut": "",
+      "spaname": "",
+      "bioname": ""
+    },
+      {"study": "AB1234",
+      "patnum": "",
+      "model": "",
+      "datacut": "",
+      "spaname": "",
+      "bioname": ""
+    },
+    {"study": "XY8765",
+      "patnum": "< 50 Patients",
+      "model": "GDM",
+      "datacut": "",
+      "spaname": "",
+      "bioname": ""
+    }
+
+    ]
+  },
+  "status": [
+    [
+      "Open",
+      "2020-06-24T21:32:21.688Z",
+      "dsi_code"
+    ]
+  ],
+  "processed": false
+},
+{
+  "request": {
+    "type": "Advice",
+    "date": "2020-06-24T11:32:21.688Z",
+    "method": "Form",
+    "reference": "8f490825-821a-411d-8ac3-944bacabe95f"
+  },
+  "requestor": {
+    "firstname": "Donald",
+    "lastname": "Duck",
+    "email": "dd@disney.ca"
+  },
+  "requestdetail": {
+    "summary": "Require 3 COVID-19 studies sending to University",
+    "description": "Require advice on anonymization of the 3 studies to be sent to abc@xyz.com at University.\n How do I proceed?\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+    "other": [
+      {
+    }
+    ]
+  },
+  "status": [
+    [
+      "Open",
+      "2020-06-24T11:32:21.688Z",
+      "dsi_code"
+    ]
+  ],
+  "processed": false
+},
+{
+  "request": {
+    "type": "Vivli EN request",
+    "date": "2020-07-24T11:32:21.688Z",
+    "method": "Email",
+    "reference": "c950746a-24da-4329-bb1a-7b4aca5a4c06"
+  },
+  "requestor": {
+    "firstname": "Donald",
+    "lastname": "Duck",
+    "email": "dd@disney.ca"
+  },
+  "requestdetail": {
+    "summary": "Vivli En #1234",
+    "description": "The original email description\n How do I proceed?\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+    "other": [
+      {
+    }
+    ]
+  },
+  "status": [
+    [
+      "Open",
+      "2020-07-24T11:32:21.688Z",
+      "dsi_code"
+    ]
+  ],
+  "processed": false
+}
+]
