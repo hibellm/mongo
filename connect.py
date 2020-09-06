@@ -237,7 +237,7 @@ dsido.insert_one(file_data)
 # TAKE A LIST OF FILES AND LOAD AS OBJECTS THEN UPDATE
 mylist = [['eg', 'T'], ['EX', 'T'], ['MH', 'T'], ['LB', 'T'], ['ZA', 'T'], ['ae_RCR', 'V']]
 
-# HOW MANY BEFROE WE LOAD
+# HOW MANY BEFORE WE LOAD
 print(f"The number of observations before : {dsido.count_documents({})}")
 
 for item in mylist:

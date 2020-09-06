@@ -14,7 +14,15 @@ dsilog = db.activityLog
 dsiraw = db.rawrequest
 dsireq = db.requests
 
+'''
+So the Process should be
 
+1. take raw and move to request
+2. check each criteria
+ - if passed set to True and update the modified date
+3. if allgood is False...and modified recently, check if it is now True
+ - if true run the process 
+'''
 
 def getdocs(col=None, query={}):
     if col:
@@ -65,6 +73,7 @@ dsiraw.insert_many(raw_insert)
 
 # REFERENCE LISTS
 requesttypes = ['Data Sharing Request', 'Advice']
+# GET THIS LIST FROM THE DICTIONARY
 status = ['Active', 'In progress', 'On hold', 'Closed', 'Referred', 'Other', 'Unknown', 'Completed']
 processed = [True, False, 'Error', '']
 
@@ -82,76 +91,184 @@ def proccessraw():
     # 1 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
     advice = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[1]}"}, {'processed': False}]})
 
-    for a in advice:
-        print(a)
-
-        # PROCESS THE RAW REQUEST TO A PROCESSED REQUEST
-        dsireqentry = {}
-        dsireqentry['request'] = a['request']
-        dsireqentry['requestor'] = a['requestor']
-        dsireqentry['status'] = a['status'][0]  # OPEN
-        dsireqentry['requestor'] = a['requestor']
-        dsireqentry.pop('_id', None)
-        dsireqentry['check'] = {"requestor": True, "study": True, "sharable": False, "contract": True}
-        dsireqentry['allgood'] = all(value is True for value in dsireqentry['check'].values())
-
-        # UPDATE THE RAW TO PROCESSED
-        updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
-
-        enterlog(dsilog, status[0], a['request']['reference'], 'hibellm', "Request: Raw request to processed request", "Clean-up and population of tables")
-
-        # SEND CONFIRMATION EMAIL FOR A REQUEST
-        # sendmail("request",a['requestor']['email'], a['request']['reference'])
-
-        enterlog(dsilog, status[-1], a['request']['reference'], 'hibellm', "Request: Email sent", f"Email sent to {a['requestor']['email']}")
-
-
-    # 2 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
-    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': False}]})
-
-    for d in dsr:
-        # UPDATE THE RAW TO PROCESSED
-        updatedocs(dsiraw, {"request.reference": f"{d['request']['reference']}"}, {'$set': {'processed': True}})
-        # LETS PRINT OUT THE STUDIES REQUESTED
-        dsireqentry = {}
-        for i in d['requestdetail']['other']:
-            ns = len(d['requestdetail']['other'])
-            dsireqentry['request'] = d['request']
-            dsireqentry['requestor'] = d['requestor']
-            dsireqentry['requestdetail'] = {}
-            dsireqentry['requestdetail']['summary'] = d['requestdetail']['summary']
-            dsireqentry['requestdetail']['description'] = d['requestdetail']['description']
-            dsireqentry['rochestudynumber'] = i['study']  # WOULD CHECK AGAINST THE VALID LIST
-            dsireqentry['studydetails'] = i
-
-            # CHECK IF STUDY IS SHARABLE
-            # CHECK IF STUDY HAS CONTRACT
-            # CHECK IF STUDY HAS RIGHT PATIENTS
-            # CLEAN UP AND CHECK ENTRY
+    if advice:
+        for a in advice:
+            # PROCESS THE RAW REQUEST TO A PROCESSED REQUEST
+            dsireqentry = {}
+            dsireqentry['request'] = a['request']
+            dsireqentry['requestor'] = a['requestor']
+            dsireqentry['status'] = a['status'][0]  # OPEN
+            dsireqentry['requestor'] = a['requestor']
             dsireqentry.pop('_id', None)
             dsireqentry['check'] = {"requestor": True, "study": True, "sharable": False, "contract": True}
             dsireqentry['allgood'] = all(value is True for value in dsireqentry['check'].values())
 
-            print(dsireqentry)
-            dsireq.insert_one(dsireqentry)
-            # dsireq.update_one({'_id': url}, {"$set": dsireqentry}, upsert=True)
+            # UPDATE THE RAW TO PROCESSED
+            updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
+            enterlog(dsilog, status[0], a['request']['reference'], 'hibellm', "Request: Raw request to processed request", "Clean-up and population of tables")
 
-        updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
-        enterlog(dsilog, status[0], d['request']['reference'], 'hibellm', f"Request: Raw request to processed request (Studies : {ns})",
-                 "Clean-up and population of tables")
+            # SEND CONFIRMATION EMAIL FOR A REQUEST
+            # sendmail("request",a['requestor']['email'], a['request']['reference'])
 
+            enterlog(dsilog, status[-1], a['request']['reference'], 'hibellm', f"Confirmation Email (Request Acknowledgement) sent to {a['requestor']['email']}")
+    else:
+        # NO ADVICE TO PROCESS
+        pass
 
+    # 2 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
+    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': False}]})
+
+    if dsr:
+        for d in dsr:
+            # UPDATE THE RAW TO PROCESSED
+            updatedocs(dsiraw, {"request.reference": f"{d['request']['reference']}"}, {'$set': {'processed': True}})
+            # LETS PRINT OUT THE STUDIES REQUESTED
+            dsireqentry = {}
+            for i in d['requestdetail']['other']:
+                ns = len(d['requestdetail']['other'])
+                dsireqentry['request'] = d['request']
+                dsireqentry['requestor'] = d['requestor']
+                dsireqentry['requestdetail'] = {}
+                dsireqentry['requestdetail']['summary'] = d['requestdetail']['summary']
+                dsireqentry['requestdetail']['description'] = d['requestdetail']['description']
+                dsireqentry['status'] = d['status']
+                dsireqentry['rochestudynumber'] = i['study']  # WOULD CHECK AGAINST THE VALID LIST
+                dsireqentry['studydetails'] = i
+
+                # CHECK IF STUDY IS SHARABLE
+                # CHECK IF STUDY HAS CONTRACT
+                # CHECK IF STUDY HAS RIGHT PATIENTS
+                # CLEAN UP AND CHECK ENTRY
+                dsireqentry.pop('_id', None)
+                dsireqentry['check'] = {"requestor": True, "study": True, "sharable": False, "contract": True}
+                dsireqentry['allgood'] = all(value is True for value in dsireqentry['check'].values())
+
+                print(dsireqentry)
+                dsireq.insert_one(dsireqentry)
+                # dsireq.update_one({'_id': url}, {"$set": dsireqentry}, upsert=True)
+
+            updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
+            enterlog(dsilog, status[0], d['request']['reference'], 'hibellm', f"Request: Raw request to processed request (Studies : {ns})",
+                     "Clean-up and population of tables")
+    else:
+        # NO DSR TO PROCESS
+        pass
 
 proccessraw()
 
-processreq():
+
+# PROCESS THE CLEAN REQUESTS - WHICH ARE ALLGOOD = True
+def processreq():
+
+    requests = getdocs(dsireq, {'$and': [{"": f"{requesttypes[0]}"}, {'allgood': True}]})
+
+    for r in requests:
+        jira = makejira(r['rochestudynumber'])
+        addlabel('Oncology')
+        updatedocs(dsiraw, {"request.reference": f"{r['request']['reference']}"}, {'$set': {'processed': True}})
+        updatedocs(dsireq, {"request.reference": f"{r['request']['reference']}"}, {'$addtoset': {['in progress', dt.datetime.now(), 'dsi_code']}})
+
+        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+                 f"Request: Jira Ticket created to process request (JIRA : {jira.key})",
+                 "Clean-up and population of tables")
+
     which requests can be processed?
     make jira ticket?
-    send emmail?
+    send email?
     perform taks?
     update status entry (to next level)
     enter task into log
 
-checkallgood
-    check all notgood entries
-    has the status changed?
+
+
+# CHECK WHAT IS STILL NOT OKAY
+def chkallgood():
+    '''
+    check which documents are allgood=False. Check when last updated.
+    If updated within the last 20 mins - run the check on that.
+    :return:
+    '''
+    docs = getdocs(dsireq, {"$and": [{"allgood": False}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]})
+
+    # RUN THE CHECK
+    for doc in docs:
+        if doc['requestor'] == False:
+            chkrequestor()
+        if doc['requestor'] == False:
+            chkrawpath()
+        if doc['requestor'] == False:
+            chkanapath()
+        if doc['requestor'] == False:
+            chkcontract()
+        if doc['requestor'] == False:
+            chkready()
+        if doc['requestor'] == False:
+            chk()
+
+
+    # LAST THING IS TO RECHECK IF ALL IS GOOD AND PROCESS
+    docs = getdocs(dsireq, {"$and": [{"allgood": True}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]})
+    theprocess()
+
+
+# CHECK FOLDER IS ACCESSIBLE/VALID
+def chkrawpath():
+    '''
+    update Mongo.request.anapath to tru if path is valid and accessible and something in there
+    :return:
+    '''
+    if valid:
+        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
+        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'modifieddate': dt.datetime.now()}})
+        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+                 f"Checking raw path is valid and accessible",
+                 f"Path {path} is valid and accessible for anonymization")
+
+
+def chkallgood():
+    '''
+    check all components to see if everything is ok.
+    If yes then kick off the process
+    :return:
+    '''
+    if all([True,True,False]):
+        print("false")
+    else:
+        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'allgood': True}})
+        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'modifieddate': dt.datetime.now()}})
+        # update jira from on hold to in-progress
+        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+                 f"Checking all criteriaChecking raw path is valid and accessible",
+                 f"All criteria have passed -  Setting to allgood=True")
+
+def theprocess():
+    '''
+    Run the anonymization process
+    :return:
+    '''
+    # Run the process to anonymize - USE A QUEUE SYSTEM TO LINE UP
+
+
+
+
+# UTILITY FUNCTIONS
+def createreport():
+    create report of all log actions, by reference, (original, reqid)
+
+def archivelog():
+    extract logs by date (mongo export)
+    export and zip data
+    store zip file.
+
+def openarchive():
+    open an archive and load to a new DB for checking.
+
+def checkstudy():
+    if study is a rochestudynumber
+    check already anonymized (search through deliverables)
+    check rawpath
+    check anapath
+
+def initiateanon():
+    if allgood, can initiate anon
+
