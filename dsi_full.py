@@ -5,6 +5,7 @@ from bson.son import SON
 import bson
 import datetime as dt
 import json
+import pickle
 
 client = MongoClient('localhost', 27017)    # Configure the connection to the database
 
@@ -250,18 +251,92 @@ def theprocess():
 
 
 
-
+import operator
+from operator import itemgetter
 # UTILITY FUNCTIONS
 def createreport():
-    create report of all log actions, by reference, (original, reqid)
+    logs = getdocs(dsilog, {})
+    # EXTRACT THE REFERENCE AND THE DATE FOR SORTING
+    xlogs = []
+    for log in logs:
+        xlogs.append([log['logwho'] , log['logDate'], log])
 
+    sorted(xlogs, key=itemgetter(0,1))
+
+    # HEADINGS
+    print(f"Log Report : {dt.datetime.now().strftime('%d-%b-%Y %H:%M:%S')}\n{'='*33}\n")
+    print(f"Reference\n{'-'*36}")
+    for xlog in xlogs:
+        print(f"{xlog[2]['logwho']}")
+        print(xlog)
+        # PRINT OUT TO A HTML FILE AND THEN TO PDF IF YOU WANT.
+
+
+createreport()
+
+# COULD TRY MONGOEXPORT BUT OVERKILL
 def archivelog():
-    extract logs by date (mongo export)
-    export and zip data
-    store zip file.
+    # FIND ALL ENTRIES BETWEEN DATES - EXCEPT THE ARCHIVE LOG ENTRY
+    logs = getdocs(dsilog, {'$and' : [{"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }},
+                                      {'$ne': 'Not applicable'}]})
 
-def openarchive():
-    open an archive and load to a new DB for checking.
+    # GET THE LIST OF _IDS TO REMOVE ONCE SAVED
+    # EXPORT THE LOGS TO A JSON FILE
+    with open(f"./logarchive_{dt.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.json", 'w') as fp:
+        json.dump(logs, fp)
+
+    # ADD ENTRY TO LOG
+    enterlog(dsilog, status[0], 'Not applicable', 'hibellm',
+             f"ARCHIVE: Action log entries [scheduled process]",
+             f"The log entries for [x to y] have been archived to a JSON file: {filepath}")
+
+    # DELETE THE LOG ENTRIES
+    for i in logs:
+        delete where _id=ObjectId(i)
+
+
+
+
+def findarchive(date):
+    logs = getdocs(dsilog, {"logaction": "ARCHIVE: Action log entries [scheduled process]" })
+
+    if isinstance(date, date):
+        pass
+    else:
+        print(f"Pass in a date, eg dt.datetime()")
+
+
+
+    for log in logs:
+        dates = str(log['logreason'][log['logreason'].find('[') + 1:log['logreason'].find(']')]).split('to')
+
+        if dt.datetime.strptime(dates[0].strip(), '%Y-%m-%d %H:%M:%S') <= date <= dt.datetime.strptime(dates[-1].strip(), '%Y-%m-%d %H:%M:%S'):
+            print("in between")
+        else:
+            print("No!")
+
+        startdt =
+        stopdt = log['why']
+        logfile = log['why'][log['why'].find(":")+1:]
+
+        log = openarchive (logfile)
+        print(log)
+
+
+
+def openarchive(logfile=None):
+    if logfile:
+        try:
+            with open(logfile, 'r') as myfile:
+                data = myfile.read()
+            return json.loads(data)
+        except Exception as e:
+            print(f"Could not read the JSON file '{logfile}' - {e}")
+    else:
+        print(f"No logfile defined - Stopping Processing!")
+
+openarchive("./logarchive_2020_09_11_22_28_51.json")
+
 
 def checkstudy():
     if study is a rochestudynumber

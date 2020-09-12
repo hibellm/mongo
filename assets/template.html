@@ -3,9 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
-
+	  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/fomantic-ui@2.8.4/dist/semantic.min.css">
+<!--        FOR PLOTTING METRICS-->
+        <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script>
 </head>
 <body>
 
+<div class="ui segment">
+<h1>Report of Action Log</h1>
+
+</div>
+
+<div class="ui bottom attached  tab segment"  data-tab="metrics2">
+    <h1>A test heading of metrics  - page 2</h1>
+
+    <div class="chart" id="bargraph">
+        <script>
+            var graphs = {{plot | safe}};
+            Plotly.plot('bargraph',graphs,{});
+        </script>
+    </div>
+</div>
 </body>
 </html>
