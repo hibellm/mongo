@@ -6,6 +6,9 @@ import bson
 import datetime as dt
 import json
 import pickle
+import operator
+from operator import itemgetter
+
 
 client = MongoClient('localhost', 27017)    # Configure the connection to the database
 
@@ -25,9 +28,12 @@ So the Process should be
  - if true run the process 
 '''
 
-def getdocs(col=None, query={}):
+def getdocs(col=None, query={}, withid=False):
     if col:
-        m = list(col.find(query, {"_id": 0}))
+        if withid:
+            m = list(col.find(query))
+        else:
+            m = list(col.find(query, {"_id": 0}))
         print(f"{col.count_documents(query)} documents were retrieved from: {col.full_name} using query: {query}")
         return m
     else:
@@ -189,22 +195,23 @@ def chkallgood():
     If updated within the last 20 mins - run the check on that.
     :return:
     '''
-    docs = getdocs(dsireq, {"$and": [{"allgood": False}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]})
+    docs = getdocs(dsireq, {"$and": [{"allgood": False}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]},True)
 
     # RUN THE CHECK
     for doc in docs:
+        pass
         if doc['requestor'] == False:
-            chkrequestor()
+            chkrequestor(doc['_id'])
         if doc['requestor'] == False:
-            chkrawpath()
+            chkrawpath(doc['_id'])
         if doc['requestor'] == False:
-            chkanapath()
+            chkanapath(doc['_id'])
         if doc['requestor'] == False:
-            chkcontract()
+            chkcontract(doc['_id'])
         if doc['requestor'] == False:
-            chkready()
+            chkready(doc['_id'])
         if doc['requestor'] == False:
-            chk()
+            chk(doc['_id'])
 
 
     # LAST THING IS TO RECHECK IF ALL IS GOOD AND PROCESS
@@ -212,35 +219,26 @@ def chkallgood():
     theprocess()
 
 
-# CHECK FOLDER IS ACCESSIBLE/VALID
-def chkrawpath():
-    '''
-    update Mongo.request.anapath to tru if path is valid and accessible and something in there
-    :return:
-    '''
-    if valid:
-        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
-        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'modifieddate': dt.datetime.now()}})
-        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
-                 f"Checking raw path is valid and accessible",
-                 f"Path {path} is valid and accessible for anonymization")
-
-
-def chkallgood():
+def chkallgood(mid):
     '''
     check all components to see if everything is ok.
     If yes then kick off the process
     :return:
     '''
-    if all([True,True,False]):
+    doc = getdocs(dsireq, {"_id": mid}, True)
+    dc = doc['check']
+
+    if all([dc['requestor'], dc['study'], dc['sharable'], dc['contract']]):
         print("false")
     else:
-        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'allgood': True}})
-        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'modifieddate': dt.datetime.now()}})
+        updatedocs(dsireq, {"_id": mid}, {'$set': {'allgood': True, 'modifieddate': dt.datetime.now()}})
         # update jira from on hold to in-progress
         enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
-                 f"Checking all criteriaChecking raw path is valid and accessible",
+                 f"Checking all criteria Checking raw path is valid and accessible",
                  f"All criteria have passed -  Setting to allgood=True")
+        # ALL IS GOOD SO LETS START THE ANON
+        initiateanon()
+
 
 def theprocess():
     '''
@@ -251,10 +249,13 @@ def theprocess():
 
 
 
-import operator
-from operator import itemgetter
+
 # UTILITY FUNCTIONS
 def createreport():
+    """
+    Create report of the action Log based off some criteria (the query)
+    :return:
+    """
     logs = getdocs(dsilog, {})
     # EXTRACT THE REFERENCE AND THE DATE FOR SORTING
     xlogs = []
@@ -271,14 +272,13 @@ def createreport():
         print(xlog)
         # PRINT OUT TO A HTML FILE AND THEN TO PDF IF YOU WANT.
 
-
 createreport()
 
-# COULD TRY MONGOEXPORT BUT OVERKILL
+# COULD TRY MONGOEXPORT BUT OVERKILL FOR WHAT WE WANT
 def archivelog():
     # FIND ALL ENTRIES BETWEEN DATES - EXCEPT THE ARCHIVE LOG ENTRY
     logs = getdocs(dsilog, {'$and' : [{"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }},
-                                      {'$ne': 'Not applicable'}]})
+                                      {"logaction": {'$ne': 'Not applicable'}}]}, True)
 
     # GET THE LIST OF _IDS TO REMOVE ONCE SAVED
     # EXPORT THE LOGS TO A JSON FILE
@@ -292,7 +292,8 @@ def archivelog():
 
     # DELETE THE LOG ENTRIES
     for i in logs:
-        delete where _id=ObjectId(i)
+        # DO NOT USE DELETE WITH NO QUERY!  ONLY USE DELETE FOR THE LOG ENTRIES THAT ARE ARCHIVED!
+        delete where _id=ObjectId(i)  (dsi.deleteone({}))
 
 
 
@@ -305,23 +306,15 @@ def findarchive(date):
     else:
         print(f"Pass in a date, eg dt.datetime()")
 
-
-
     for log in logs:
         dates = str(log['logreason'][log['logreason'].find('[') + 1:log['logreason'].find(']')]).split('to')
 
         if dt.datetime.strptime(dates[0].strip(), '%Y-%m-%d %H:%M:%S') <= date <= dt.datetime.strptime(dates[-1].strip(), '%Y-%m-%d %H:%M:%S'):
-            print("in between")
+            print(f"The log file is {log['logreason'][log['logreason'].find('file:')+6:] }")
+            log = openarchive (log['logreason'][log['logreason'].find('file:')+6:])
+            print(log)
         else:
             print("No!")
-
-        startdt =
-        stopdt = log['why']
-        logfile = log['why'][log['why'].find(":")+1:]
-
-        log = openarchive (logfile)
-        print(log)
-
 
 
 def openarchive(logfile=None):
@@ -338,11 +331,68 @@ def openarchive(logfile=None):
 openarchive("./logarchive_2020_09_11_22_28_51.json")
 
 
-def checkstudy():
-    if study is a rochestudynumber
-    check already anonymized (search through deliverables)
-    check rawpath
-    check anapath
+def checkstudy(mid, study):
+    """
+    Check if the study is valid and update the document to True
+    :param mid:
+    :param study:
+    :return:
+    """
+    if ru.validstudy(study):
+        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.study': True}, {'modifieddate': dt.datetime.now()}})
+        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+                 f"Checking raw path is valid and accessible",
+                 f"Path {path} is valid and accessible for anonymization")
+    else:
+       pass
+    # RECHECK IF NOW EVERYTHING IS
+    chkallgood()
+
+
+def checkrawpath(mid, rawpath):
+    """
+    Check if the study is valid and update the document to True
+    :param mid:
+    :param study:
+    :return:
+    """
+    if ru.validpath(rawpath):
+        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.rawpath': True}, {'modifieddate': dt.datetime.now()}})
+        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+                 f"Checking raw path is valid and accessible",
+                 f"Path {path} is valid and accessible for anonymization")
+    else:
+        pass
+    # RECHECK IF NOW EVERYTHING IS
+    chkallgood()
+
+def checkanapath(mid, anapath):
+    """
+    Check if the study is valid and update the document to True
+    :param mid:
+    :param study:
+    :return:
+    """
+    if ru.validpath(anapath):
+        updatedocs(dsireq, {ObjectId(mid)}, {'$set': {'check.anapath': True}})
+        updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"},
+                   {'$set': {'modifieddate': dt.datetime.now()}})
+    else:
+        pass
+    # RECHECK IF NOW EVERYTHING IS
+    chkallgood()
+
+
+def checkdeliverables():
+
+    deliverables = getdocs()
+
+    for deliver in deliverables:
+        if deliver = "what we want":
+            print("Alread have done this...")
+        else:
+            print("Not done this study so ok to continue")
+
 
 def initiateanon():
     if allgood, can initiate anon
