@@ -6,6 +6,7 @@ import bson
 import datetime as dt
 import json
 import pickle
+import os
 import operator
 from operator import itemgetter
 
@@ -18,6 +19,7 @@ dsilog = db.activityLog
 dsiraw = db.rawrequest
 dsireq = db.requests
 
+logpath = '.'
 '''
 So the Process should be
 
@@ -39,7 +41,6 @@ def getdocs(col=None, query={}, withid=False):
     else:
         print(f"No collection given - Stopping processing!")
 
-
 def updatedocs(col=None, query={}, update={}):
     if col:
         print(f"{col.count_documents(query)} documents were found from: {col.full_name} using query: {query}")
@@ -50,9 +51,8 @@ def updatedocs(col=None, query={}, update={}):
     else:
         print(f"No collection given - Stopping processing!")
 
-
-def enterlog(col=dsilog, ref=None, who=None, what=None, why=None, when=f"{dt.datetime.now()}"):
-    # CREATE LOG DICTIONARY
+def enterlog(ref=None, who=None, what=None, why=None, when=f"{dt.datetime.now()}"):
+    # CREATE LOG DICTIONARY ENTRY
     dsilogentry = {}
     if None not in (ref, who, what, why):
         dsilogentry['logref'] = ref
@@ -61,14 +61,12 @@ def enterlog(col=dsilog, ref=None, who=None, what=None, why=None, when=f"{dt.dat
         dsilogentry['logreason'] = why
         dsilogentry['logDate'] = when
         try:
-            a = col.insert_one(dsilogentry)
+            a = dsilog.insert_one(dsilogentry)
             print(f"Log entry was inserted: ObjectId: {a}")
         except Exception as e:
             print(f"Insert did not work : {e}")
     else:
         print("Need to enter all values for - Ref/who/what/why - Stopping processing!")
-
-
 
 
 # IMPORT DATA INTO THE COLLECTIONS
@@ -96,10 +94,29 @@ def proccessraw():
     :return:
     '''
     # 1 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
-    advice = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[1]}"}, {'processed': False}]})
+    advice = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[1]}"}, {'processed': True}]}, True)
+    if advice:
+        rawadvice(advice)
 
+    # 2 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
+    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': False}]}, True)
+    if dsr:
+        rawdsr(dsr)
+
+proccessraw()
+
+# THE FUNCTIONS TO PROCESS THE RAW REQUESTS
+def rawadvice(advice):
+    '''
+    Process the RAWREQUESTS when it is ADVICE.
+    1. Move to clean request
+    2. Update source rawrequest
+    3. Enter log
+    :return:
+    '''
     if advice:
         for a in advice:
+            pass
             # PROCESS THE RAW REQUEST TO A PROCESSED REQUEST
             dsireqentry = {}
             dsireqentry['request'] = a['request']
@@ -110,21 +127,24 @@ def proccessraw():
             dsireqentry['check'] = {"requestor": True, "study": True, "sharable": False, "contract": True}
             dsireqentry['allgood'] = all(value is True for value in dsireqentry['check'].values())
 
-            # UPDATE THE RAW TO PROCESSED
-            updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
+            # CREATE REQUEST ENTRY AND UPDATE THE RAW TO PROCESSED
+            dsireq.insert_one(dsireqentry)
+            updatedocs(dsiraw, {"_id": ObjectId(a['_id'])}, {'$set': {'processed': True}, {'modifiedDate': dt.datetime.now()}})
             enterlog(dsilog, status[0], a['request']['reference'], 'hibellm', "Request: Raw request to processed request", "Clean-up and population of tables")
 
             # SEND CONFIRMATION EMAIL FOR A REQUEST
             # sendmail("request",a['requestor']['email'], a['request']['reference'])
-
             enterlog(dsilog, status[-1], a['request']['reference'], 'hibellm', f"Confirmation Email (Request Acknowledgement) sent to {a['requestor']['email']}")
     else:
         # NO ADVICE TO PROCESS
         pass
 
-    # 2 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
-    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': False}]})
+def rawdsr(dsr):
+    '''
 
+    :param dsr:
+    :return:
+    '''
     if dsr:
         for d in dsr:
             # UPDATE THE RAW TO PROCESSED
@@ -150,19 +170,15 @@ def proccessraw():
                 dsireqentry['check'] = {"requestor": True, "study": True, "sharable": False, "contract": True}
                 dsireqentry['allgood'] = all(value is True for value in dsireqentry['check'].values())
 
-                print(dsireqentry)
+                # CREATE REQUEST ENTRY AND UPDATE THE RAW TO PROCESSED
                 dsireq.insert_one(dsireqentry)
-                # dsireq.update_one({'_id': url}, {"$set": dsireqentry}, upsert=True)
 
-            updatedocs(dsiraw, {"request.reference": f"{a['request']['reference']}"}, {'$set': {'processed': True}})
+            updatedocs(dsiraw, {"_id": ObjectId(d['_id'])}, {'$set': {'processed': True}, {'modifiedDate': dt.datetime.now()}})
             enterlog(dsilog, status[0], d['request']['reference'], 'hibellm', f"Request: Raw request to processed request (Studies : {ns})",
-                     "Clean-up and population of tables")
+                         "Clean-up and population of tables")
     else:
         # NO DSR TO PROCESS
         pass
-
-proccessraw()
-
 
 # PROCESS THE CLEAN REQUESTS - WHICH ARE ALLGOOD = True
 def processreq():
@@ -179,12 +195,12 @@ def processreq():
                  f"Request: Jira Ticket created to process request (JIRA : {jira.key})",
                  "Clean-up and population of tables")
 
-    which requests can be processed?
-    make jira ticket?
-    send email?
-    perform taks?
-    update status entry (to next level)
-    enter task into log
+    # which requests can be processed?
+    # make jira ticket?
+    # send email?
+    # perform taks?
+    # update status entry (to next level)
+    # enter task into log
 
 
 
@@ -195,11 +211,11 @@ def chkallgood():
     If updated within the last 20 mins - run the check on that.
     :return:
     '''
-    docs = getdocs(dsireq, {"$and": [{"allgood": False}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]},True)
+    docs = getdocs(dsireq, {"$and": [{"allgood": False}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]}, True)
 
     # RUN THE CHECK
     for doc in docs:
-        pass
+        # pass
         if doc['requestor'] == False:
             chkrequestor(doc['_id'])
         if doc['requestor'] == False:
@@ -218,7 +234,6 @@ def chkallgood():
     docs = getdocs(dsireq, {"$and": [{"allgood": True}, {"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }}]})
     theprocess()
 
-
 def chkallgood(mid):
     '''
     check all components to see if everything is ok.
@@ -226,19 +241,19 @@ def chkallgood(mid):
     :return:
     '''
     doc = getdocs(dsireq, {"_id": mid}, True)
-    dc = doc['check']
+    dc = doc[0]['check']
 
     if all([dc['requestor'], dc['study'], dc['sharable'], dc['contract']]):
-        print("false")
-    else:
-        updatedocs(dsireq, {"_id": mid}, {'$set': {'allgood': True, 'modifieddate': dt.datetime.now()}})
+        updatedocs(dsireq, {"_id": mid}, {'$set': {'allgood': True, 'modifiedDate': dt.datetime.now()}})
         # update jira from on hold to in-progress
-        enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+        enterlog(dsilog, status[0], doc[0]['request']['reference'], 'hibellm',
                  f"Checking all criteria Checking raw path is valid and accessible",
                  f"All criteria have passed -  Setting to allgood=True")
         # ALL IS GOOD SO LETS START THE ANON
         initiateanon()
-
+        print("true")
+    else:
+        print("false")
 
 def theprocess():
     '''
@@ -247,6 +262,10 @@ def theprocess():
     '''
     # Run the process to anonymize - USE A QUEUE SYSTEM TO LINE UP
 
+def addstatus():
+    query1 = {"_id": ObjectId("5f305be5708fa30a8c421207")}
+    update = {'$addToSet': {"status": {'$each': [ ['In Progress', dt.datetime.now(), 'dsi_code'] ]}}}
+    dsiraw.update_one(query1, update)
 
 
 
@@ -277,26 +296,25 @@ createreport()
 # COULD TRY MONGOEXPORT BUT OVERKILL FOR WHAT WE WANT
 def archivelog():
     # FIND ALL ENTRIES BETWEEN DATES - EXCEPT THE ARCHIVE LOG ENTRY
-    logs = getdocs(dsilog, {'$and' : [{"request.date": {"$gte": f"{dt.datetime.now()-dt.timedelta(days=100)}" }},
+    now = dt.datetime.now()
+    before= now - dt.timedelta(days=100)
+    logs = getdocs(dsilog, {'$and' : [{"request.date": {"$gte": f"{before}" }},
                                       {"logaction": {'$ne': 'Not applicable'}}]}, True)
 
     # GET THE LIST OF _IDS TO REMOVE ONCE SAVED
     # EXPORT THE LOGS TO A JSON FILE
-    with open(f"./logarchive_{dt.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}.json", 'w') as fp:
+    with open(os.path.join(logpath,f"logarchive_{now.strftime('%Y_%m_%d_%H_%M_%S')}.json"), 'w') as fp:
         json.dump(logs, fp)
 
     # ADD ENTRY TO LOG
     enterlog(dsilog, status[0], 'Not applicable', 'hibellm',
              f"ARCHIVE: Action log entries [scheduled process]",
-             f"The log entries for [x to y] have been archived to a JSON file: {filepath}")
+             f"The log entries for [{before} to {now}] have been archived to a JSON file: {filepath}")
 
-    # DELETE THE LOG ENTRIES
+    # DELETE THE LOG ENTRIES THAT ARE ARCHIVED
     for i in logs:
-        # DO NOT USE DELETE WITH NO QUERY!  ONLY USE DELETE FOR THE LOG ENTRIES THAT ARE ARCHIVED!
-        delete where _id=ObjectId(i)  (dsi.deleteone({}))
-
-
-
+        # DO NOT USE DELETE WITHOUT A QUERY!  ONLY USE DELETE FOR THE LOG ENTRIES THAT ARE ARCHIVED!
+        dsilog.deleteone({logs[0]['_id']})
 
 def findarchive(date):
     logs = getdocs(dsilog, {"logaction": "ARCHIVE: Action log entries [scheduled process]" })
@@ -316,7 +334,6 @@ def findarchive(date):
         else:
             print("No!")
 
-
 def openarchive(logfile=None):
     if logfile:
         try:
@@ -331,6 +348,7 @@ def openarchive(logfile=None):
 openarchive("./logarchive_2020_09_11_22_28_51.json")
 
 
+# CHECK FUNCTIONS
 def checkstudy(mid, study):
     """
     Check if the study is valid and update the document to True
@@ -339,7 +357,7 @@ def checkstudy(mid, study):
     :return:
     """
     if ru.validstudy(study):
-        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.study': True}, {'modifieddate': dt.datetime.now()}})
+        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.study': True}, {'modifiedDate': dt.datetime.now()}})
         enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
                  f"Checking raw path is valid and accessible",
                  f"Path {path} is valid and accessible for anonymization")
@@ -347,7 +365,6 @@ def checkstudy(mid, study):
        pass
     # RECHECK IF NOW EVERYTHING IS
     chkallgood()
-
 
 def checkrawpath(mid, rawpath):
     """
@@ -357,7 +374,7 @@ def checkrawpath(mid, rawpath):
     :return:
     """
     if ru.validpath(rawpath):
-        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.rawpath': True}, {'modifieddate': dt.datetime.now()}})
+        updatedocs(dsireq, {"_id": f"ObjectId('{mid}')"}, {'$set': {'check.rawpath': True}, {'modifiedDate': dt.datetime.now()}})
         enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
                  f"Checking raw path is valid and accessible",
                  f"Path {path} is valid and accessible for anonymization")
@@ -374,26 +391,51 @@ def checkanapath(mid, anapath):
     :return:
     """
     if ru.validpath(anapath):
-        updatedocs(dsireq, {ObjectId(mid)}, {'$set': {'check.anapath': True}})
+        updatedocs(dsireq, {ObjectId(mid)}, {'$set': {'check.anapath': True}, {'modifiedDate': dt.datetime.now()}})
         updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"},
-                   {'$set': {'modifieddate': dt.datetime.now()}})
+                   {'$set': {'modifiedDate': dt.datetime.now()}})
     else:
         pass
     # RECHECK IF NOW EVERYTHING IS
     chkallgood()
 
-
-def checkdeliverables():
+def checkdeliverables(,):
 
     deliverables = getdocs()
 
     for deliver in deliverables:
-        if deliver = "what we want":
-            print("Alread have done this...")
+        if deliver == "what we want":
+            print("Already have done this...")
         else:
             print("Not done this study so ok to continue")
 
+    md5('.\logarchive_2020-09-11 22_28_51.json')
 
-def initiateanon():
-    if allgood, can initiate anon
 
+
+
+
+def initiateanon(mid):
+    anon = getdocs(dsireq, {"_id": f"ObjectId('{mid}')"})
+
+    # EXTRACT THE ELEMENTS REQUIRED AS INPUT TO THE ANON
+    run_anonymization (anon[0])
+
+
+    # UPDATE JIRA TICKET
+
+    # TIDY UP
+    updatedocs(dsireq, {ObjectId(mid)}, {'$set': {'check.anapath': True}})
+    updatedocs(dsireq, {"request.reference": f"{a['request']['reference']}"},
+               {'$set': {'modifiedDate': dt.datetime.now()}})
+    enterlog(dsilog, status[0], r['request']['reference'], 'hibellm',
+             f"Running anonymization ",
+             f"Anonymization completed using this input: {anon}")
+
+import hashlib
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
