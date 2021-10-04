@@ -9,7 +9,7 @@ import pickle
 import os
 import operator
 from operator import itemgetter
-
+from mongo.proccess_core import processutil, check, cleanup
 
 client = MongoClient('localhost', 27017)    # Configure the connection to the database
 
@@ -20,6 +20,7 @@ dsiraw = db.rawrequest
 dsireq = db.requests
 
 logpath = '.'
+
 '''
 So the Process should be
 
@@ -77,10 +78,13 @@ raw_insert = json.loads(data)
 dsiraw.insert_many(raw_insert)
 
 # REFERENCE LISTS
-requesttypes = ['Data Sharing Request', 'Advice']
+requesttypes = ['Advice', 'Data Sharing Request', 'CDSE', 'JIRA', 'EMAIL']
 # GET THIS LIST FROM THE DICTIONARY
 status = ['Active', 'In progress', 'On hold', 'Closed', 'Referred', 'Other', 'Unknown', 'Completed']
 processed = [True, False, 'Error', '']
+
+
+
 
 # PROCESS THE RAW INPUT INTO REQUEST
 
@@ -94,16 +98,25 @@ def proccessraw():
     :return:
     '''
     # 1 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
-    advice = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[1]}"}, {'processed': True}]}, True)
-    if advice:
-        rawadvice(advice)
-
+    advice = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': True}]}, True)
+    rawadvice(advice) if advice else None
+    
     # 2 - GET ADVICE/OTHER AND JUST MAKE A CLEAN ENTRY
-    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[0]}"}, {'processed': False}]}, True)
-    if dsr:
-        rawdsr(dsr)
+    dsr = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[1]}"}, {'processed': False}]}, True)
+    rawdsr(dsr) if dsr else None
+
+    # 3 - GET CDSE AND JUST MAKE A CLEAN ENTRY
+    cdse = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[2]}"}, {'processed': False}]}, True)
+    rawcdse(cdse) if cdse else None
+
+    # 4 - GET JIRA AND JUST MAKE A CLEAN ENTRY
+    jira = getdocs(dsiraw, {'$and': [{"request.type": f"{requesttypes[3]}"}, {'processed': False}]}, True)
+    rawjira(jira) if jira else None
+        
 
 proccessraw()
+
+
 
 # THE FUNCTIONS TO PROCESS THE RAW REQUESTS
 def rawadvice(advice):
@@ -139,14 +152,17 @@ def rawadvice(advice):
         # NO ADVICE TO PROCESS
         pass
 
+
 def rawdsr(dsr):
     '''
-
+    Process the raw request which is a DSR. 
     :param dsr:
     :return:
     '''
     if dsr:
-        for d in dsr:
+        print(f"Processing {len(dsr):02d} DSR requests...")
+        for n, d in enumerate(dsr):
+            print(f"Processing {n:02d} of {len(dsr):02d} DSR requests...")
             # UPDATE THE RAW TO PROCESSED
             updatedocs(dsiraw, {"request.reference": f"{d['request']['reference']}"}, {'$set': {'processed': True}})
             # LETS PRINT OUT THE STUDIES REQUESTED
@@ -174,8 +190,10 @@ def rawdsr(dsr):
                 dsireq.insert_one(dsireqentry)
 
             updatedocs(dsiraw, {"_id": ObjectId(d['_id'])}, {'$set': {'processed': True}, {'modifiedDate': dt.datetime.now()}})
-            enterlog(dsilog, status[0], d['request']['reference'], 'hibellm', f"Request: Raw request to processed request (Studies : {ns})",
-                         "Clean-up and population of tables")
+
+            print(f"Processing finished...")  
+            enterlog(dsilog, status[0], d['request']['reference'], 'hibellm', f"Request: Raw request to processed request (Studies : {ns})", 
+            "Clean-up and population of tables")                       
     else:
         # NO DSR TO PROCESS
         pass
@@ -255,6 +273,7 @@ def chkallgood(mid):
     else:
         print("false")
 
+
 def theprocess():
     '''
     Run the anonymization process
@@ -284,14 +303,19 @@ def createreport():
     sorted(xlogs, key=itemgetter(0,1))
 
     # HEADINGS
-    print(f"Log Report : {dt.datetime.now().strftime('%d-%b-%Y %H:%M:%S')}\n{'='*33}\n")
+    print(f"\nLog Report : {dt.datetime.now().strftime('%d-%b-%Y %H:%M:%S')}\n{'='*33}\n")
     print(f"Reference\n{'-'*36}")
     for xlog in xlogs:
-        print(f"{xlog[2]['logwho']}")
+        print(f"\n{xlog[2]['logwho']}")
         print(xlog)
         # PRINT OUT TO A HTML FILE AND THEN TO PDF IF YOU WANT.
+    return xlogs
 
-createreport()
+x = createreport()
+
+print(x[0])
+
+
 
 # COULD TRY MONGOEXPORT BUT OVERKILL FOR WHAT WE WANT
 def archivelog():
@@ -439,3 +463,237 @@ def md5(fname):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+
+
+"""
+Processing logic
+
+
+main
+    checklz
+    checklog
+
+    checkreq
+        what request type is it?
+
+            process raw CDSE/JIRA/GITHUB/ADVICE/SUPPORT/EMAIL
+
+
+            if CDSE       
+                all meta correct? (CID?)                
+                collection found?
+                start job
+                    download collection
+                    adjust the collection folder structure
+                    enterlog
+                    run_anoncode
+                    bundle package
+                    cleanup (log entries)
+
+
+Notebooks for schedules
+
+1 min - check the requests queue
+5 min - check email
+
+
+"""
+
+
+
+print("all True") if all(value == True for value in x['check'].values()) else print("Nope false still")
+  
+ALL BASIC ENTRIES SHOULD HAVE:
+processed/refid/modifiedDate/valid
+if appropriate status
+
+{
+    "_id" : ObjectId("5f305bf2708fa30a8c42120a"),
+    "refid": "23e362c5-19ce-4ac1-97e0-688d5ad3a2a",
+    "processed": False,
+    "modifiedDate": "",
+    "valid" : True,    
+    "request" : {
+        "type" : "Data Sharing Request",
+        "date" : "2020-06-20T21:32:21.688Z",
+        "method" : "Form",
+        "reference" : "23e362c5-19ce-4ac1-97e0-688d5ad3a2af"
+    },
+    "requestor" : {
+        "firstname" : "Peter",
+        "lastname" : "Parker",
+        "email" : "PP@newspaper.nyc"
+    },
+    /*CUSTOM SECTION*/
+    "requestdetail" : {
+        "summary" : "Require Oncology study BP29772 for analysis",
+        "description" : "the BP2772 study is a study that is required\n for Oncology paper. \n Anonymized data is required"
+    },
+    "rochestudynumber" : "bp29772",
+    "studydetails" : {
+        "study" : "bp29772",
+        "patnum" : "> 50 Patients",
+        "model" : "SDTM",
+        "datacut" : "",
+        "spaname" : "Paul Dick",
+        "bioname" : "John Clesese"
+    },
+    /* END  */
+    "check" : {
+        "requestor" : True,
+        "study" : True,
+        "sharable" : False,
+        "contract" : True
+    },
+    "allgood": False
+
+
+}
+abc =["sgsag","xxsa", "xa"]
+
+def vlchk(vin,vlist):
+    return True if vin in abc else False
+
+vlchk("xa ", abc)
+
+# ADD TO LIST
+x={"status": [["Open", "2020-06-20T21:32:21.688Z", "dsi_code"],
+              ["Open", "2020-06-20T21:32:21.111Z", "dsi_code"]
+                ]
+}
+x['status'].append(["Closed", "2002-24-5T21:32:21.688Z", "aags"])
+
+# GET STATUS HISTORY
+
+newlist = x['status']
+print(newlist.sort(key = lambda x: x[1]))
+
+
+
+def Sort(sub_li, element=0, rev=False):
+    """
+    Sort list by the nth element, 
+
+    Args:
+        sub_li ([type]): [description]
+        element (int, optional): [description]. Defaults to 0.
+        rev (bool, optional): [description]. Defaults to False.
+
+    Returns:
+        [type]: [description]
+    """
+    # reverse = None (Sorts in Ascending order)
+    # key is set to sort using <x> element of 
+    # sublist lambda has been used
+    sub_li.sort(key = lambda x: x[element], reverse=rev)
+    return sub_li
+  
+# Driver Code
+sub_li =[['rishav', 10], ['akash', 5], ['ram', 20], ['gaurav', 15]]
+print(Sort(sub_li,-1,True))
+print(Sort(newlist,-1,True))
+
+
+
+
+CDSEPAYLOAD
+{
+    "refid": "23e362c5-19ce-4ac1-97e0-688d5ad3a2a",
+    "processed": False,
+    "modifiedDate": "",
+    "valid" : True,    
+    "request" : {
+        "type" : "CDSE Final CSR Request",
+        "date" : "2020-06-20T21:32:21.688Z",
+        "method" : "HTTP POST",
+        "reference" : "23e362c5-19ce-4ac1-97e0-688d5ad3a2af"
+    },
+    "requestor" : {
+        "firstname" : "<not applicable>",
+        "lastname" : "<not applicable>",
+        "email" : "<not applicable>"
+    },
+    /*CUSTOM SECTION*/
+    "requestdetail" : {
+        "summary" : "Require anonymization of BP29772",
+        "description" : "the BP2772 study has been finaliszed and is ready for anonymization"
+    },
+    "rochestudynumber" : "bp29772",
+    "studydetails" : {
+        "study" : "bp29772",
+        "cid" : ""        
+    },
+    /* END  */
+    "check" : {
+        "requestor" : True,
+        "study" : True,
+        "cid" : False,
+        "access" : True
+    },
+    "allgood": False
+    "status":   [["Open", "2020-06-20T21:32:21.688Z", "dsi_code"],
+                 ["Open", "2020-06-20T21:32:21.688Z", "dsi_code"]
+                ]
+
+
+
+# CONVENTIONS
+mid = Mongod doc ID variable
+mdbid = Mongodb ID  (prd/dev/pub)
+
+mon = 
+pmon =
+imon =
+dmon =
+
+mdb = main prod
+pdb = public 
+ddb = dev
+
+
+
+
+
+def chk1():
+    print("Check 1")
+    return True
+
+def chk2():
+    print("Check 2")
+    return True
+
+def cleanup():
+    print("Cleanup")
+
+
+def anon():
+    print("running anon")
+
+
+def sched_1_min():
+    print("running schedule 1 min")
+    a = chk1()
+    b = chk2()
+
+    cleanup()
+
+sched_1_min()
+
+def sched_5_min():
+    print("running schedule 1 min")
+    a = chk1()
+    b = chk2()
+    anon() if a else None
+    cleanup()
+
+sched_5_min()
+
+
+
+
+
+
+
+
